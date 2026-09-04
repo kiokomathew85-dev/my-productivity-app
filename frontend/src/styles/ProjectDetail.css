@@ -211,6 +211,20 @@
   margin-bottom: 20px;
 }
 
+.tasks-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.task-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.task-controls select, .task-controls button { padding: 8px 10px; border: 1px solid #d8e0e5; border-radius: 5px; background: white; color: #344b5c; }
+.task-controls button { cursor: pointer; }
+.reminder { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 11px 14px; margin-bottom: 18px; background: #fff4d5; color: #765815; border-left: 4px solid #e3ad3c; }
+.reminder button { padding: 6px 9px; background: transparent; color: inherit; border: 1px solid currentColor; border-radius: 4px; }
+.suggestions { display: flex; gap: 10px; flex-wrap: wrap; margin: -6px 0 18px; color: #344b5c; font-size: 13px; }
+.suggestions span { padding: 8px 10px; background: #edf4f1; border-radius: 5px; }
+.suggestions small { display: block; color: #587083; }
+.calendar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.calendar-grid section { min-width: 0; padding: 12px; background: #f7faf9; border: 1px solid #d9e8e2; border-radius: 6px; }
+.calendar-grid h3 { margin: 0 0 10px; color: #2f6859; font-size: 14px; }
+.calendar-grid .task-item { margin-bottom: 8px; }
+
 .tasks-list {
   display: flex;
   flex-direction: column;

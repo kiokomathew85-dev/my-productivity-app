@@ -34,6 +34,7 @@ function Navbar() {
         {user && (
           <>
             <button onClick={() => setDarkMode(!darkMode)} className="theme-btn" aria-label="Toggle dark mode">{darkMode ? 'Light' : 'Dark'}</button>
+            <button onClick={() => navigate('/settings')} className="theme-btn">Settings</button>
             <span className="user-info">Welcome, {user.username}!</span>
             <button onClick={handleLogout} className="logout-btn">
               Logout

@@ -60,6 +60,7 @@ class Task(db.Model):
     status = db.Column(db.String(50), default='pending')
     priority = db.Column(db.String(20), default='medium', nullable=False)
     due_date = db.Column(db.DateTime, nullable=True)
+    position = db.Column(db.Integer, default=0, nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -71,6 +72,7 @@ class Task(db.Model):
             'status': self.status,
             'priority': self.priority,
             'due_date': self.due_date.isoformat() if self.due_date else None,
+            'position': self.position,
             'project_id': self.project_id,
             'created_at': self.created_at.isoformat()
         }

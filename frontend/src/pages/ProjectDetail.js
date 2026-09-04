@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import TaskItem from '../components/TaskItem';
-import { projectAPI, taskAPI } from '../services/api';
+import { dashboardAPI, projectAPI, taskAPI } from '../services/api';
 import '../styles/ProjectDetail.css';
 
 function ProjectDetail() {
@@ -26,6 +26,12 @@ function ProjectDetail() {
   const [editDesc, setEditDesc] = useState('');
   const [editPriority, setEditPriority] = useState('medium');
   const [editDueDate, setEditDueDate] = useState('');
+  const [taskFilter, setTaskFilter] = useState('all');
+  const [taskSort, setTaskSort] = useState('position');
+  const [viewMode, setViewMode] = useState('list');
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [reminder, setReminder] = useState('');
 
   const perPage = 10;
 
@@ -69,6 +75,18 @@ function ProjectDetail() {
 
     fetchProjectAndTasks();
   }, [fetchProjectAndTasks, navigate]);
+
+  useEffect(() => {
+    const dueSoon = tasks.find((task) => task.status !== 'completed' && task.due_date && new Date(task.due_date) <= new Date(Date.now() + 86400000));
+    if (!dueSoon || localStorage.getItem('reminders') === 'false') return;
+    const message = `Due soon: ${dueSoon.title}`;
+    setReminder(message);
+    if ('Notification' in window && Notification.permission === 'granted') new Notification('Productivity reminder', { body: message });
+  }, [tasks]);
+
+  const requestNotifications = async () => {
+    if ('Notification' in window) await Notification.requestPermission();
+  };
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
@@ -140,6 +158,37 @@ function ProjectDetail() {
     }
   };
 
+  const handleDrop = async (targetId) => {
+    if (!draggedTaskId || draggedTaskId === targetId) return;
+    const reordered = [...tasks];
+    const fromIndex = reordered.findIndex((task) => task.id === draggedTaskId);
+    const toIndex = reordered.findIndex((task) => task.id === targetId);
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    setTasks(reordered);
+    setDraggedTaskId(null);
+    try { await taskAPI.reorder(id, reordered.map((task) => task.id)); } catch (err) { setError('Could not save task order.'); }
+  };
+
+  const loadSuggestions = async () => {
+    try { setSuggestions((await dashboardAPI.getSuggestions()).data.suggestions); } catch (err) { setError('Could not generate suggestions.'); }
+  };
+
+  const visibleTasks = [...tasks]
+    .filter((task) => taskFilter === 'all' || task.status === taskFilter || task.priority === taskFilter)
+    .sort((first, second) => {
+      if (taskSort === 'due') return new Date(first.due_date || '2999-01-01') - new Date(second.due_date || '2999-01-01');
+      if (taskSort === 'priority') return ({ high: 0, medium: 1, low: 2 }[first.priority] || 1) - ({ high: 0, medium: 1, low: 2 }[second.priority] || 1);
+      return (first.position || 0) - (second.position || 0);
+    });
+
+  const calendarGroups = visibleTasks.reduce((groups, task) => {
+    const day = task.due_date ? task.due_date.slice(0, 10) : 'No due date';
+    groups[day] = groups[day] || [];
+    groups[day].push(task);
+    return groups;
+  }, {});
+
   if (loading) {
     return (
       <div className="project-detail">
@@ -164,6 +213,7 @@ function ProjectDetail() {
 
       <div className="project-detail-container">
         {error && <div className="error-message">{error}</div>}
+        {reminder && <div className="reminder" role="status">{reminder}<button onClick={requestNotifications}>Enable browser reminders</button></div>}
 
         <div className="project-header">
           {editingProject ? (
@@ -238,24 +288,29 @@ function ProjectDetail() {
         </div>
 
         <div className="tasks-section">
-          <h2>Tasks ({tasks.length})</h2>
+          <div className="tasks-heading"><h2>Tasks ({tasks.length})</h2><div className="task-controls"><select value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)}><option value="all">All tasks</option><option value="pending">Pending</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="high">High priority</option><option value="medium">Medium priority</option><option value="low">Low priority</option></select><select value={taskSort} onChange={(e) => setTaskSort(e.target.value)}><option value="position">Custom order</option><option value="due">Due date</option><option value="priority">Priority</option></select><button className="secondary" onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}>{viewMode === 'list' ? 'Calendar' : 'List'}</button><button className="secondary" onClick={loadSuggestions}>Suggest tasks</button></div></div>
+          {suggestions.length > 0 && <div className="suggestions"><strong>Suggested next steps</strong>{suggestions.map((suggestion) => <span key={suggestion.title}>{suggestion.title} <small>{suggestion.reason}</small></span>)}</div>}
           
-          {tasks.length === 0 ? (
+          {visibleTasks.length === 0 ? (
             <div className="no-tasks">
               <p>No tasks yet. Create one to get started!</p>
             </div>
           ) : (
             <>
-              <div className="tasks-list">
-                {tasks.map((task) => (
+              {viewMode === 'calendar' ? <div className="calendar-grid">{Object.entries(calendarGroups).map(([day, dayTasks]) => <section key={day}><h3>{day === 'No due date' ? day : new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</h3>{dayTasks.map((task) => <TaskItem key={task.id} task={task} onDelete={handleDeleteTask} onUpdate={handleUpdateTask} />)}</section>)}</div> : <div className="tasks-list">
+                {visibleTasks.map((task) => (
                   <TaskItem
                     key={task.id}
                     task={task}
                     onDelete={handleDeleteTask}
                     onUpdate={handleUpdateTask}
+                    draggable
+                    onDragStart={() => setDraggedTaskId(task.id)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => handleDrop(task.id)}
                   />
                 ))}
-              </div>
+              </div>}
 
               {totalPages > 1 && (
                 <div className="pagination">

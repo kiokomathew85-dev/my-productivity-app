@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../styles/TaskItem.css';
 
-function TaskItem({ task, onDelete, onUpdate }) {
+function TaskItem({ task, onDelete, onUpdate, draggable, onDragStart, onDragOver, onDrop }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description);
@@ -25,7 +25,7 @@ function TaskItem({ task, onDelete, onUpdate }) {
   };
 
   return (
-    <div className="task-item">
+    <div className="task-item" draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}>
       {isEditing ? (
         <div className="task-edit-form">
           <input

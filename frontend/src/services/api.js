@@ -28,6 +28,8 @@ export const authAPI = {
 
   getCurrentUser: () =>
     api.get('/auth/me'),
+  updateProfile: (username, email) =>
+    api.put('/auth/me', { username, email }),
 };
 
 // ============ PROJECT ENDPOINTS ============
@@ -55,6 +57,7 @@ export const projectAPI = {
 export const dashboardAPI = {
   getSummary: () => api.get('/dashboard/summary'),
   askAssistant: (question) => api.post('/assistant', { question }),
+  getSuggestions: () => api.get('/assistant/suggestions'),
 };
 
 // ============ TASK ENDPOINTS ============
@@ -74,6 +77,8 @@ export const taskAPI = {
 
   delete: (id) =>
     api.delete(`/tasks/${id}`),
+  reorder: (projectId, task_ids) =>
+    api.put(`/projects/${projectId}/tasks/reorder`, { task_ids }),
 };
 
 export default api;

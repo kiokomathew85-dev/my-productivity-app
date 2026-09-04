@@ -36,6 +36,7 @@ def parse_datetime(value):
 
 
 def project_payload(project):
+    completed_tasks = len([task for task in project.tasks if task.status == 'completed'])
     return {
         'id': project.id,
         'name': project.name,
@@ -45,6 +46,8 @@ def project_payload(project):
         'owner_id': project.owner_id,
         'created_at': project.created_at.isoformat(),
         'task_count': len(project.tasks)
+        ,'completed_count': completed_tasks
+        ,'progress': round((completed_tasks / len(project.tasks)) * 100) if project.tasks else 0
     }
 
 
@@ -54,7 +57,9 @@ def task_payload(task):
         'title': task.title,
         'description': task.description,
         'status': task.status,
+        'priority': task.priority,
         'due_date': task.due_date.isoformat() if task.due_date else None,
+        'position': task.position,
         'project_id': task.project_id,
         'created_at': task.created_at.isoformat()
     }
@@ -73,6 +78,10 @@ def ensure_project_columns():
     if 'priority' not in task_columns:
         db.session.execute(text(
             "ALTER TABLE tasks ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT 'medium'"
+        ))
+    if 'position' not in task_columns:
+        db.session.execute(text(
+            "ALTER TABLE tasks ADD COLUMN position INTEGER NOT NULL DEFAULT 0"
         ))
     db.session.commit()
 
@@ -157,6 +166,28 @@ def get_current_user():
         'email': user.email,
         'created_at': user.created_at.isoformat()
     }), 200
+
+
+@app.route('/api/auth/me', methods=['PUT'])
+@jwt_required()
+def update_current_user():
+    """Update the authenticated user's profile details."""
+    user = User.query.get(int(get_jwt_identity()))
+    data = request.get_json() or {}
+    username = data.get('username', '').strip()
+    email = data.get('email', '').strip()
+
+    if not username or not email:
+        return jsonify({'error': 'Username and email are required'}), 400
+    if User.query.filter(User.username == username, User.id != user.id).first():
+        return jsonify({'error': 'Username already exists'}), 409
+    if User.query.filter(User.email == email, User.id != user.id).first():
+        return jsonify({'error': 'Email already exists'}), 409
+
+    user.username = username
+    user.email = email
+    db.session.commit()
+    return jsonify({'user': user.to_dict()}), 200
 
 
 # ============ PROJECT ROUTES ============
@@ -307,6 +338,24 @@ def project_assistant():
     return jsonify({'answer': answer}), 200
 
 
+@app.route('/api/assistant/suggestions', methods=['GET'])
+@jwt_required()
+def assistant_suggestions():
+    """Generate actionable task suggestions from the user's current workload."""
+    user_id = int(get_jwt_identity())
+    projects = Project.query.filter_by(owner_id=user_id).all()
+    tasks = [task for project in projects for task in project.tasks if task.status != 'completed']
+    priority_rank = {'high': 0, 'medium': 1, 'low': 2}
+    tasks.sort(key=lambda task: (priority_rank.get(task.priority, 1), task.due_date or datetime.max))
+    suggestions = [
+        {'title': task.title, 'reason': f'{task.priority.title()} priority in {task.project.name}', 'project_id': task.project_id}
+        for task in tasks[:3]
+    ]
+    if not suggestions:
+        suggestions = [{'title': 'Plan your next project milestone', 'reason': 'Your current task list is clear.', 'project_id': None}]
+    return jsonify({'suggestions': suggestions}), 200
+
+
 @app.route('/api/projects', methods=['POST'])
 @jwt_required()
 def create_project():
@@ -363,6 +412,7 @@ def get_project(project_id):
             'status': t.status,
             'priority': t.priority,
             'due_date': t.due_date.isoformat() if t.due_date else None,
+            'position': t.position,
             'created_at': t.created_at.isoformat()
         } for t in project.tasks]
     }), 200
@@ -442,21 +492,12 @@ def get_tasks(project_id):
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
-    tasks = Task.query.filter_by(project_id=project_id).paginate(
+    tasks = Task.query.filter_by(project_id=project_id).order_by(Task.position, Task.created_at).paginate(
         page=page, per_page=per_page, error_out=False
     )
     
     return jsonify({
-        'tasks': [{
-            'id': t.id,
-            'title': t.title,
-            'description': t.description,
-            'status': t.status,
-            'priority': t.priority,
-            'due_date': t.due_date.isoformat() if t.due_date else None,
-            'project_id': t.project_id,
-            'created_at': t.created_at.isoformat()
-        } for t in tasks.items],
+        'tasks': [task_payload(t) for t in tasks.items],
         'pagination': {
             'total': tasks.total,
             'pages': tasks.pages,
@@ -491,6 +532,7 @@ def create_task(project_id):
         status=data.get('status', 'pending'),
         priority=data.get('priority', 'medium'),
         due_date=parse_datetime(data.get('due_date')),
+        position=Task.query.filter_by(project_id=project_id).count(),
         project_id=project_id
     )
     
@@ -499,16 +541,7 @@ def create_task(project_id):
     
     return jsonify({
         'message': 'Task created successfully',
-        'task': {
-            'id': task.id,
-            'title': task.title,
-            'description': task.description,
-            'status': task.status,
-            'priority': task.priority,
-            'due_date': task.due_date.isoformat() if task.due_date else None,
-            'project_id': task.project_id,
-            'created_at': task.created_at.isoformat()
-        }
+        'task': task_payload(task)
     }), 201
 
 
@@ -526,16 +559,7 @@ def get_task(task_id):
     if task.project.owner_id != user_id:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    return jsonify({
-        'id': task.id,
-        'title': task.title,
-        'description': task.description,
-        'status': task.status,
-        'priority': task.priority,
-        'due_date': task.due_date.isoformat() if task.due_date else None,
-        'project_id': task.project_id,
-        'created_at': task.created_at.isoformat()
-    }), 200
+    return jsonify(task_payload(task)), 200
 
 
 @app.route('/api/tasks/<int:task_id>', methods=['PUT'])
@@ -567,19 +591,28 @@ def update_task(task_id):
     
     db.session.commit()
     
-    return jsonify({
-        'message': 'Task updated successfully',
-        'task': {
-            'id': task.id,
-            'title': task.title,
-            'description': task.description,
-            'status': task.status,
-            'priority': task.priority,
-            'due_date': task.due_date.isoformat() if task.due_date else None,
-            'project_id': task.project_id,
-            'created_at': task.created_at.isoformat()
-        }
-    }), 200
+    return jsonify({'message': 'Task updated successfully', 'task': task_payload(task)}), 200
+
+
+@app.route('/api/projects/<int:project_id>/tasks/reorder', methods=['PUT'])
+@jwt_required()
+def reorder_tasks(project_id):
+    """Persist the order of tasks after a drag-and-drop operation."""
+    user_id = int(get_jwt_identity())
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    if project.owner_id != user_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    task_ids = (request.get_json() or {}).get('task_ids', [])
+    tasks = {task.id: task for task in project.tasks}
+    if len(task_ids) != len(tasks) or set(task_ids) != set(tasks):
+        return jsonify({'error': 'task_ids must contain every project task exactly once'}), 400
+    for position, task_id in enumerate(task_ids):
+        tasks[task_id].position = position
+    db.session.commit()
+    return jsonify({'tasks': [task_payload(task) for task in sorted(tasks.values(), key=lambda item: item.position)]}), 200
 
 
 @app.route('/api/tasks/<int:task_id>', methods=['DELETE'])

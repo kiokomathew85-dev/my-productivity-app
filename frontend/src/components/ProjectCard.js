@@ -11,6 +11,8 @@ function ProjectCard({ project, onDelete }) {
       </div>
       <p className="card-description">{project.description}</p>
       <p className="project-meta"><span className={`priority priority-${project.priority || 'medium'}`}>{project.priority || 'medium'} priority</span>{project.due_date && ` Due ${new Date(project.due_date).toLocaleDateString()}`}</p>
+      <div className="progress-row"><span>Progress</span><strong>{project.progress || 0}%</strong></div>
+      <div className="progress-track"><span style={{ width: `${project.progress || 0}%` }} /></div>
       {project.match_reason && (
         <p className="match-reason">AI match: {project.match_reason}</p>
       )}

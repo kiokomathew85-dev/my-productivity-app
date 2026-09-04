@@ -17,6 +17,11 @@ body.dark-mode .project-card, body.dark-mode .task-item, body.dark-mode .create-
 body.dark-mode h1, body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode .card-description, body.dark-mode .task-description { color: #e7eef1; }
 body.dark-mode input, body.dark-mode textarea, body.dark-mode select { background: #1b2b34; color: #e7eef1; border-color: #46606d; }
 body.dark-mode .upcoming-section { background: #2b302e; border-color: #655a37; }
+body.dark-mode .project-header, body.dark-mode .create-task-section, body.dark-mode .tasks-section { background: #22333d; }
+body.dark-mode .project-meta, body.dark-mode .description, body.dark-mode .task-due-date { color: #b8c8d4; }
+body.dark-mode .task-controls select, body.dark-mode .task-controls button { background: #1b2b34; color: #e7eef1; border-color: #46606d; }
+body.dark-mode .suggestions { color: #e7eef1; }
+body.dark-mode .suggestions span { background: #2b4b45; }
 
 html, body, #root {
   width: 100%;
