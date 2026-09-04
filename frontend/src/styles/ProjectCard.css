@@ -1,0 +1,114 @@
+.project-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  transition: transform 0.3s, box-shadow 0.3s;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.project-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.card-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.task-count {
+  background: #f0f4ff;
+  color: #667eea;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: 10px;
+}
+
+.card-description {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+  flex: 1;
+}
+
+.project-meta { margin: -10px 0 18px; color: #587083; font-size: 12px; }
+.priority { display: inline-block; margin-right: 8px; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.priority-high { background: #fde3d9; color: #a44226; }
+.priority-medium { background: #fff0c7; color: #876318; }
+.priority-low { background: #dceee8; color: #286653; }
+
+.card-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.view-btn,
+.delete-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.view-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.delete-btn {
+  background: #fee;
+  color: #c33;
+  border: 1px solid #f5b3b3;
+}
+
+.delete-btn:hover {
+  background: #fdd;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .task-count {
+    align-self: flex-start;
+  }
+
+  .card-footer {
+    flex-direction: column;
+  }
+}
