@@ -125,14 +125,13 @@ This guide provides instructions for deploying the Productivity App to productio
    - Go to [vercel.com](https://vercel.com)
    - Click "Add new..." → "Project"
    - Import your GitHub repository
-   - Select frontend folder as root
-   - Build settings:
-     - Framework: `Create React App`
-     - Build command: `npm run build`
-     - Output directory: `build`
+   - Keep the project root set to the repository root. Do not select `frontend` as the root, because the root `vercel.json` also deploys the Flask API.
+   - The committed `vercel.json` configures both the React static build and `/api` serverless routes.
 
 3. **Set Environment Variables**
-   - Add: `REACT_APP_API_URL=<your-backend-url>/api`
+   - Add a hosted PostgreSQL connection string as `DATABASE_URL`. Vercel's filesystem is ephemeral and cannot use the local SQLite database for production.
+   - Add strong values for `SECRET_KEY` and `JWT_SECRET_KEY` (at least 32 random characters each).
+   - Leave `REACT_APP_API_URL` unset when the frontend and API deploy together; the frontend automatically uses the same-origin `/api` path.
 
 4. **Deploy**
    - Vercel automatically deploys on git push
