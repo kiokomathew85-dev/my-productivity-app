@@ -40,7 +40,8 @@ function Signup() {
       // Redirect to dashboard
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Signup failed. Please try again.');
+      const apiError = err.response?.data?.error;
+      setError(typeof apiError === 'string' ? apiError : 'Signup failed. The server is temporarily unavailable. Please try again.');
     } finally {
       setLoading(false);
     }
