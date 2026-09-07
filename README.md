@@ -328,7 +328,8 @@ When adding features:
 
 This project is created for educational purposes.
 
-## 👤 Author
+## 👤 Author   
+- mathew kioko -
 
 Created as a final project for Moringa School Full-Stack Development Course.
 
