@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Productivity App
 
 A full-stack web application for managing projects and tasks. Built with Flask, PostgreSQL, and React, this app helps users organize their work and track progress on multiple projects with intuitive task management features.
@@ -334,3 +335,6 @@ Created as a final project for Moringa School Full-Stack Development Course.
 ---
 
 For more information or issues, please check the GitHub repository.
+=======
+# my-productivity-app
+>>>>>>> origin/main
