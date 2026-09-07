@@ -1,5 +1,4 @@
 import os
-import tempfile
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -7,8 +6,12 @@ load_dotenv()
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
-default_database_url = f"sqlite:///{os.path.join(tempfile.gettempdir(), 'productivity-app.db')}" if os.getenv('VERCEL') else 'sqlite:///instance/app.db'
-raw_database_url = os.getenv('DATABASE_URL', default_database_url)
+raw_database_url = os.getenv('DATABASE_URL')
+
+if not raw_database_url:
+    if os.getenv('VERCEL'):
+        raise RuntimeError('DATABASE_URL must be configured in Vercel for persistent project storage')
+    raw_database_url = 'sqlite:///instance/app.db'
 
 if raw_database_url.startswith('sqlite:///'):
     relative_path = raw_database_url.replace('sqlite:///', '', 1)

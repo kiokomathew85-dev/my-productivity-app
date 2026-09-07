@@ -129,7 +129,7 @@ This guide provides instructions for deploying the Productivity App to productio
    - The committed `vercel.json` configures both the React static build and `/api` serverless routes.
 
 3. **Set Environment Variables**
-   - Add a hosted PostgreSQL connection string as `DATABASE_URL`. Vercel's filesystem is ephemeral and cannot use the local SQLite database for production.
+   - Add a hosted PostgreSQL connection string as `DATABASE_URL`. This is required: Vercel's filesystem is ephemeral and cannot use the local SQLite database for production. Without it, the API intentionally refuses to start rather than risking project data being lost.
    - Add strong values for `SECRET_KEY` and `JWT_SECRET_KEY` (at least 32 random characters each).
    - Leave `REACT_APP_API_URL` unset when the frontend and API deploy together; the frontend automatically uses the same-origin `/api` path.
 
