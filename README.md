@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Productivity App
 
 A full-stack web application for managing projects and tasks. Built with Flask, PostgreSQL, and React, this app helps users organize their work and track progress on multiple projects with intuitive task management features.
