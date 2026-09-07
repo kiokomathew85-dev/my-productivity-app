@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
 import ProjectCard from '../components/ProjectCard';
 import { dashboardAPI, projectAPI } from '../services/api';
 import '../styles/Dashboard.css';
 
 function Dashboard() {
   const [projects, setProjects] = useState([]);
+  const [notificationProjects, setNotificationProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
@@ -22,36 +22,24 @@ function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('relevance');
   const [summary, setSummary] = useState(null);
-  const [assistantQuestion, setAssistantQuestion] = useState('');
-  const [assistantAnswer, setAssistantAnswer] = useState('');
-  const [askingAssistant, setAskingAssistant] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState('all');
   const navigate = useNavigate();
 
   const perPage = 9;
 
   const fetchSummary = useCallback(async () => {
     try {
-      const response = await dashboardAPI.getSummary();
-      setSummary(response.data);
+      const [summaryResponse, projectsResponse] = await Promise.all([
+        dashboardAPI.getSummary(),
+        projectAPI.getAll(1, 100),
+      ]);
+      setSummary(summaryResponse.data);
+      setNotificationProjects(projectsResponse.data.projects);
     } catch (err) {
       console.error('Error fetching dashboard summary:', err);
     }
   }, []);
-
-  const askAssistant = async (e) => {
-    e.preventDefault();
-    if (!assistantQuestion.trim()) return;
-
-    try {
-      setAskingAssistant(true);
-      const response = await dashboardAPI.askAssistant(assistantQuestion);
-      setAssistantAnswer(response.data.answer);
-    } catch (err) {
-      setAssistantAnswer('I could not read your project data right now.');
-    } finally {
-      setAskingAssistant(false);
-    }
-  };
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -90,9 +78,7 @@ function Dashboard() {
     const query = queryOverride.trim();
 
     if (!query) {
-      setSearchMode(false);
-      setPage(1);
-      fetchProjects();
+      clearSearch();
       return;
     }
 
@@ -118,9 +104,22 @@ function Dashboard() {
     fetchProjects();
   };
 
-  const runSuggestedSearch = (query) => {
-    setSearchQuery(query);
-    handleSearch({ preventDefault: () => {} }, query);
+  const focusSection = (selector, focusSelector) => {
+    document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (focusSelector) {
+      window.setTimeout(() => document.querySelector(focusSelector)?.focus(), 300);
+    }
+  };
+
+  const handleNavigation = (destination) => {
+    if (destination === 'settings') {
+      navigate('/settings');
+      return;
+    }
+
+    navigate('/dashboard');
+    if (destination === 'projects') focusSection('#projects-section');
+    if (destination === 'tasks') focusSection('.upcoming-section, #projects-section');
   };
 
   const visibleProjects = [...projects]
@@ -134,6 +133,11 @@ function Dashboard() {
       if (sortBy === 'recent') return new Date(second.created_at) - new Date(first.created_at);
       return (second.relevance_score || 0) - (first.relevance_score || 0);
     });
+
+  const pendingProjects = notificationProjects.filter((project) => (project.progress || 0) < 100);
+  const notificationCount = (summary?.overdue_tasks || 0)
+    + (summary?.upcoming_tasks?.length || 0)
+    + notificationProjects.length;
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
@@ -151,6 +155,7 @@ function Dashboard() {
       setNewProjectDueDate('');
       setPage(1);
       await fetchProjects();
+      await fetchSummary();
     } catch (err) {
       setError('Failed to create project. Please try again.');
     } finally {
@@ -162,7 +167,8 @@ function Dashboard() {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
         await projectAPI.delete(projectId);
-        setProjects(projects.filter(p => p.id !== projectId));
+        setProjects(projects.filter((p) => p.id !== projectId));
+        setNotificationProjects(notificationProjects.filter((project) => project.id !== projectId));
       } catch (err) {
         setError('Failed to delete project. Please try again.');
       }
@@ -171,179 +177,234 @@ function Dashboard() {
 
   return (
     <div className="dashboard">
-      <Navbar />
-      
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <h1>My Projects</h1>
-        </div>
+      <div className="dashboard-shell">
+        <aside className="dashboard-sidebar">
+          <div className="sidebar-logo">M</div>
+          <nav className="sidebar-nav" aria-label="Sidebar navigation">
+            <button type="button" className="nav-item active" onClick={() => handleNavigation('dashboard')}>Dashboard</button>
+            <button type="button" className="nav-item" onClick={() => handleNavigation('projects')}>Projects</button>
+            <button type="button" className="nav-item" onClick={() => handleNavigation('tasks')}>Tasks</button>
+            <button type="button" className="nav-item" onClick={() => focusSection('#projects-section')}>Reports</button>
+            <button type="button" className="nav-item" onClick={() => handleNavigation('settings')}>Settings</button>
+          </nav>
+        </aside>
 
-        {error && <div className="error-message">{error}</div>}
+        <main className="dashboard-main">
+          <header className="main-topbar">
+            <div>
+              <p className="topbar-label">Dashboard</p>
+              <h1>Project</h1>
+            </div>
 
-        {summary && (
-          <section className="metrics-grid" aria-label="Productivity summary">
-            <div className="metric"><strong>{summary.projects}</strong><span>Projects</span></div>
-            <div className="metric"><strong>{summary.tasks}</strong><span>Total tasks</span></div>
-            <div className="metric"><strong>{summary.completed_tasks}</strong><span>Completed</span></div>
-            <div className={`metric ${summary.overdue_tasks ? 'metric-warning' : ''}`}><strong>{summary.overdue_tasks}</strong><span>Overdue</span></div>
+            <div className="topbar-actions">
+              <div className="notification-wrap">
+                <button
+                  type="button"
+                  className="notification-btn"
+                  aria-label="Notifications"
+                  aria-expanded={notificationsOpen}
+                  onClick={() => setNotificationsOpen((isOpen) => !isOpen)}
+                >
+                  <span aria-hidden="true">&#128276;</span>
+                  {notificationCount > 0 && <span className="notification-count">{notificationCount}</span>}
+                </button>
+
+                {notificationsOpen && (
+                  <div className="notification-panel" role="region" aria-label="Notifications">
+                    <div className="notification-heading">
+                      <strong>Notifications</strong>
+                      <span>{notificationCount} total</span>
+                    </div>
+
+                    <div className="notification-filters" role="group" aria-label="Notification filters">
+                      {['all', 'pending', 'projects'].map((filter) => (
+                        <button
+                          key={filter}
+                          type="button"
+                          className={notificationFilter === filter ? 'selected' : ''}
+                          aria-pressed={notificationFilter === filter}
+                          onClick={() => setNotificationFilter(filter)}
+                        >
+                          {filter[0].toUpperCase() + filter.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+
+                    {notificationFilter === 'pending' && pendingProjects.length === 0 ? (
+                      <p className="notification-empty">No pending projects.</p>
+                    ) : notificationFilter === 'projects' && notificationProjects.length === 0 ? (
+                      <p className="notification-empty">No projects yet.</p>
+                    ) : notificationFilter === 'all' && notificationCount === 0 ? (
+                      <p className="notification-empty">You are all caught up.</p>
+                    ) : (
+                      <div className="notification-list">
+                        {notificationFilter === 'all' && summary?.overdue_tasks > 0 && (
+                          <div className="notification-item notification-alert">
+                            <strong>{summary.overdue_tasks} overdue task{summary.overdue_tasks === 1 ? '' : 's'}</strong>
+                            <small>Review your projects for missed deadlines.</small>
+                          </div>
+                        )}
+
+                        {notificationFilter === 'all' && summary?.upcoming_tasks?.map((task) => (
+                          <Link
+                            key={task.id}
+                            to={`/projects/${task.project_id}`}
+                            className="notification-item"
+                            onClick={() => setNotificationsOpen(false)}
+                          >
+                            <strong>{task.title}</strong>
+                            <small>{task.project_name} · Due {new Date(task.due_date).toLocaleDateString()}</small>
+                          </Link>
+                        ))}
+
+                        {(notificationFilter === 'all' ? notificationProjects : notificationFilter === 'pending' ? pendingProjects : notificationProjects).map((project) => (
+                          <Link
+                            key={`project-${project.id}`}
+                            to={`/projects/${project.id}`}
+                            className="notification-item notification-project"
+                            onClick={() => setNotificationsOpen(false)}
+                          >
+                            <strong>{project.name}</strong>
+                            <small>
+                              {project.completed_count || 0}/{project.task_count || 0} tasks complete · {project.progress || 0}% · {project.priority || 'medium'} priority
+                              {project.due_date && ` · Due ${new Date(project.due_date).toLocaleDateString()}`}
+                            </small>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button type="button" className="ghost-btn" onClick={() => focusSection('.project-filter-form', '#project-search')}>Search</button>
+              <button type="button" className="ghost-btn" onClick={() => focusSection('#create-project-form', '#new-project-name')}>+ New</button>
+            </div>
+          </header>
+
+          <section className="project-toolbar-row">
+            <form onSubmit={handleSearch} className="project-filter-form">
+              <input
+                id="project-search"
+                type="search"
+                aria-label="Search projects"
+                placeholder="Search project"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={searching}
+              />
+              <button type="submit" disabled={searching}>{searching ? '...' : 'Find'}</button>
+            </form>
+
+            <div className="control-wrap">
+              <label>
+                Status
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+
+              <label>
+                Sort
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                  <option value="relevance">Best match</option>
+                  <option value="recent">Recent</option>
+                  <option value="name">Name</option>
+                  <option value="tasks">Tasks</option>
+                </select>
+              </label>
+            </div>
           </section>
-        )}
 
-        <section className="assistant-section">
-          <div>
-            <p className="eyebrow">PROJECT ASSISTANT</p>
-            <h2>What should you work on?</h2>
-          </div>
-          <form onSubmit={askAssistant} className="assistant-form">
-            <input
-              type="text"
-              aria-label="Ask project assistant"
-              placeholder="Ask about overdue tasks or your next task"
-              value={assistantQuestion}
-              onChange={(e) => setAssistantQuestion(e.target.value)}
-              disabled={askingAssistant}
-            />
-            <button type="submit" disabled={askingAssistant}>{askingAssistant ? 'Thinking...' : 'Ask'}</button>
-          </form>
-          {assistantAnswer && <p className="assistant-answer">{assistantAnswer}</p>}
-        </section>
+          {error && <div className="error-message">{error}</div>}
 
-        <section className="ai-search-section">
-          <div>
-            <p className="eyebrow">AI PROJECT FINDER</p>
-            <h2>Find the right project</h2>
-            <p>Search naturally across project descriptions and tasks.</p>
-          </div>
-          <form onSubmit={handleSearch} className="project-search-form">
-            <input
-              type="search"
-              aria-label="Search projects"
-              placeholder="Try “website tasks” or “mobile app”"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              disabled={searching}
-            />
-            <button type="submit" disabled={searching}>
-              {searching ? 'Searching...' : 'Find projects'}
-            </button>
-            {searchMode && (
-              <button type="button" className="clear-search" onClick={clearSearch}>
-                Clear
-              </button>
+          <div id="projects-section">
+            {loading ? (
+              <div className="loading">Loading projects...</div>
+            ) : projects.length === 0 ? (
+              <div className="no-projects">
+                <p>{searchMode ? 'No projects matched that search.' : 'No projects yet. Create one to get started!'}</p>
+              </div>
+            ) : (
+              <>
+                {visibleProjects.length === 0 ? (
+                  <div className="no-projects"><p>No projects match this filter.</p></div>
+                ) : (
+                  <div className="projects-grid">
+                    {visibleProjects.map((project) => (
+                      <ProjectCard key={project.id} project={project} onDelete={handleDeleteProject} />
+                    ))}
+                  </div>
+                )}
+
+                {!searchMode && visibleProjects.length > 0 && (
+                  <div className="pagination">
+                    <button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
+                    <span>Page {page} of {totalPages}</span>
+                    <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
+                  </div>
+                )}
+              </>
             )}
-          </form>
-          <div className="search-suggestions">
-            <span>Try:</span>
-            {['website tasks', 'mobile app', 'completed'].map((suggestion) => (
-              <button key={suggestion} type="button" onClick={() => runSuggestedSearch(suggestion)}>
-                {suggestion}
-              </button>
-            ))}
           </div>
-        </section>
 
-        <div className="create-project-section">
-          <h2>Create New Project</h2>
-          <form onSubmit={handleCreateProject} className="create-project-form">
+          <form id="create-project-form" onSubmit={handleCreateProject} className="create-project-form">
+            <h2>Create New Project</h2>
             <input
+              id="new-project-name"
               type="text"
-              placeholder="Project Name"
+              placeholder="Project name"
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               disabled={creatingProject}
             />
             <textarea
-              placeholder="Project Description (optional)"
+              placeholder="Description"
               value={newProjectDesc}
               onChange={(e) => setNewProjectDesc(e.target.value)}
               disabled={creatingProject}
               rows="3"
             />
             <div className="form-row">
-              <label>Priority<select value={newProjectPriority} onChange={(e) => setNewProjectPriority(e.target.value)} disabled={creatingProject}>
-                <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
-              </select></label>
-              <label>Due date<input type="date" value={newProjectDueDate} onChange={(e) => setNewProjectDueDate(e.target.value)} disabled={creatingProject} /></label>
+              <label>
+                Priority
+                <select value={newProjectPriority} onChange={(e) => setNewProjectPriority(e.target.value)} disabled={creatingProject}>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label>
+                Due date
+                <input type="date" value={newProjectDueDate} onChange={(e) => setNewProjectDueDate(e.target.value)} disabled={creatingProject} />
+              </label>
             </div>
-            <button type="submit" disabled={creatingProject}>
-              {creatingProject ? 'Creating...' : 'Create Project'}
-            </button>
+            <button type="submit" disabled={creatingProject}>{creatingProject ? 'Creating...' : 'Create Project'}</button>
           </form>
-        </div>
 
-        {summary && (
-          <section className="upcoming-section" aria-label="Upcoming deadlines">
-            <div className="section-heading"><div><p className="eyebrow">UP NEXT</p><h2>Upcoming deadlines</h2></div><span>{summary.upcoming_tasks.length} open task{summary.upcoming_tasks.length === 1 ? '' : 's'}</span></div>
-            {summary.upcoming_tasks.length === 0 ? <p className="empty-upcoming">No open deadlines on the horizon.</p> : (
-              <div className="upcoming-list">{summary.upcoming_tasks.map((task) => <Link key={task.id} to={`/projects/${task.project_id}`} className="upcoming-item"><span>{task.title}</span><small>{task.project_name} · {new Date(task.due_date).toLocaleDateString()}</small></Link>)}</div>
-            )}
-          </section>
-        )}
-
-        {loading ? (
-          <div className="loading">Loading projects...</div>
-        ) : projects.length === 0 ? (
-          <div className="no-projects">
-            <p>{searchMode ? 'No projects matched that search.' : 'No projects yet. Create one to get started!'}</p>
-          </div>
-        ) : (
-          <>
-            <div className="project-toolbar">
-              <p>
-                {searchMode ? `${visibleProjects.length} matching project${visibleProjects.length === 1 ? '' : 's'}` : `${visibleProjects.length} project${visibleProjects.length === 1 ? '' : 's'}`}
-              </p>
-              <div className="project-controls">
-                <label>
-                  Status
-                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                    <option value="all">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In progress</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </label>
-                <label>
-                  Sort
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                    <option value="relevance">Best match</option>
-                    <option value="recent">Recently created</option>
-                    <option value="name">Name</option>
-                    <option value="tasks">Most tasks</option>
-                  </select>
-                </label>
+          {summary && summary.upcoming_tasks?.length > 0 && (
+            <section className="upcoming-section" aria-label="Upcoming deadlines">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">UP NEXT</p>
+                  <h2>Upcoming deadlines</h2>
+                </div>
+                <span>{summary.upcoming_tasks.length} open</span>
               </div>
-            </div>
-            {visibleProjects.length === 0 ? (
-              <div className="no-projects"><p>No projects match this filter.</p></div>
-            ) : (
-            <div className="projects-grid">
-              {visibleProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onDelete={handleDeleteProject}
-                />
-              ))}
-            </div>
-            )}
 
-            {!searchMode && visibleProjects.length > 0 && <div className="pagination">
-              <button
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
-              >
-                ← Previous
-              </button>
-              <span>Page {page} of {totalPages}</span>
-              <button
-                disabled={page === totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                Next →
-              </button>
-            </div>}
-          </>
-        )}
+              <div className="upcoming-list">
+                {summary.upcoming_tasks.map((task) => (
+                  <Link key={task.id} to={`/projects/${task.project_id}`} className="upcoming-item">
+                    <span>{task.title}</span>
+                    <small>{task.project_name} · {new Date(task.due_date).toLocaleDateString()}</small>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+        </main>
       </div>
     </div>
   );
