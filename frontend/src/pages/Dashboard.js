@@ -26,7 +26,7 @@ function Dashboard() {
   const [notificationFilter, setNotificationFilter] = useState('all');
   const navigate = useNavigate();
 
-  const perPage = 9;
+  const perPage = 1000;
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -319,6 +319,23 @@ function Dashboard() {
           </section>
 
           {error && <div className="error-message">{error}</div>}
+
+          {summary?.recent_activity?.length > 0 && (
+            <section className="activity-section" aria-label="Recent activity">
+              <div className="section-heading">
+                <div><p className="eyebrow">RECENT ACTIVITY</p><h2>What you have been working on</h2></div>
+              </div>
+              <div className="activity-list">
+                {summary.recent_activity.map((activity) => (
+                  <Link key={activity.id} to={`/projects/${activity.project_id}`} className="activity-item">
+                    <span>{activity.type === 'task_created' ? 'Task added' : 'Project created'}</span>
+                    <strong>{activity.title}</strong>
+                    <small>{activity.type === 'task_created' ? activity.project_name : 'Your projects'} · {new Date(activity.timestamp).toLocaleDateString()}</small>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div id="projects-section">
             {loading ? (

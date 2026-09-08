@@ -96,17 +96,19 @@ def signup():
     # Validation
     if not data or not data.get('username') or not data.get('email') or not data.get('password'):
         return jsonify({'error': 'Missing required fields'}), 400
+
+    email = data['email'].strip().lower()
     
     if User.query.filter_by(username=data['username']).first():
         return jsonify({'error': 'Username already exists'}), 409
     
-    if User.query.filter_by(email=data['email']).first():
+    if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already exists'}), 409
     
     # Create user
     user = User(
         username=data['username'],
-        email=data['email'],
+        email=email,
         password_hash=generate_password_hash(data['password'])
     )
     
@@ -132,8 +134,9 @@ def login():
     
     if not data or not data.get('email') or not data.get('password'):
         return jsonify({'error': 'Missing email or password'}), 400
-    
-    user = User.query.filter_by(email=data['email']).first()
+
+    email = data['email'].strip().lower()
+    user = User.query.filter_by(email=email).first()
     
     if not user or not check_password_hash(user.password_hash, data['password']):
         return jsonify({'error': 'Invalid email or password'}), 401
@@ -283,12 +286,35 @@ def dashboard_summary():
         [task for task in open_tasks if task.due_date and task.due_date >= now],
         key=lambda task: task.due_date
     )[:5]
+    recent_activity = [
+        {
+            'id': f'project-{project.id}',
+            'type': 'project_created',
+            'title': project.name,
+            'project_id': project.id,
+            'timestamp': project.created_at.isoformat(),
+        }
+        for project in projects
+    ]
+    recent_activity.extend(
+        {
+            'id': f'task-{task.id}',
+            'type': 'task_created',
+            'title': task.title,
+            'project_id': task.project_id,
+            'project_name': task.project.name,
+            'timestamp': task.created_at.isoformat(),
+        }
+        for task in tasks
+    )
+    recent_activity.sort(key=lambda activity: activity['timestamp'], reverse=True)
 
     return jsonify({
         'projects': len(projects),
         'tasks': len(tasks),
         'completed_tasks': len([task for task in tasks if task.status == 'completed']),
         'overdue_tasks': len(overdue_tasks),
+        'recent_activity': recent_activity[:8],
         'upcoming_tasks': [{
             'id': task.id,
             'title': task.title,

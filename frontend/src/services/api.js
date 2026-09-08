@@ -21,10 +21,10 @@ api.interceptors.request.use((config) => {
 
 export const authAPI = {
   signup: (username, email, password) =>
-    api.post('/auth/signup', { username, email, password }),
+    api.post('/auth/signup', { username, email: email.trim().toLowerCase(), password }),
 
   login: (email, password) =>
-    api.post('/auth/login', { email, password }),
+    api.post('/auth/login', { email: email.trim().toLowerCase(), password }),
 
   getCurrentUser: () =>
     api.get('/auth/me'),
